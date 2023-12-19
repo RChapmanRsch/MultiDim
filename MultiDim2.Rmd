@@ -221,7 +221,6 @@ sim=readRDS("sim.RDS")
 ```  
   
 ``` {r calb}  
-  
 # Calibration ####
 # 
 # sim=readRDS("sim.RDS")
@@ -267,9 +266,25 @@ calb=readRDS("calb.RDS")
 
 ``` {r results}
 
+#results plotting:
 
 
+# Extract and transform coefficients from calibrations ####
 
+coefs=lapply(calb, function(coefs){
+  coefs=coef(coefs)
+  transformed=t(sapply(1:(length(coefs)-1), function(i){
+    #print(i)
+    i=coefs[i][[1]][,!colnames(coefs[i][[1]])%in%c("g","u")]
+    if(any(names(i)=="d")){names(i)[names(i)=="d"]="d1"}
+    i=c(i,t(rep(NA,times=sum(!paste0("d",1:4) %in% names(i)))))
+    numdims=length(grep("a",names(i)))
+    a=i[which(i[paste0("a",1:numdims)]>0)]; 
+    c(a,sapply((numdims+1):length(i), function(d){-i[d]/a}))
+    }))
+  dimnames(transformed)=list(NULL,c("a",paste0("cb",1:4)))
+  transformed
+})
 # d= -b*a
 # d/a=-b
 # -d/a=b
@@ -284,7 +299,80 @@ calb=readRDS("calb.RDS")
 
 
 
-coef(calb[[1]])
+
+
+
+# Compare estimated to designed item parameters
+
+ParamErr=t(sapply(1:length(sim), function(designindex){
+
+  s=sim[[designindex]]
+  s=do.call(rbind, lapply(s$items,function(x) x$items))
+  c=coefs[[designindex]]
+
+  #items without collapsed categories 
+  notcollapseditems=!apply(c, 1, anyNA)
+
+
+  c(
+    "ni"=sum(notcollapseditems),
+    "a.bias"=sum((c[notcollapseditems,"a"]-s[notcollapseditems,"a"]))/sum(notcollapseditems),
+    "a.RMSE"=sqrt(sum((c[notcollapseditems,"a"]-s[notcollapseditems,"a"])^2)/sum(notcollapseditems)),
+    "b1.bias"=sum((c[notcollapseditems,"cb1"]-s[notcollapseditems,"cb1"]))/sum(notcollapseditems),
+    "b1.RMSE"=sqrt(sum((c[notcollapseditems,"cb1"]-s[notcollapseditems,"cb1"])^2)/sum(notcollapseditems)),
+    "b2.bias"=sum((c[notcollapseditems,"cb2"]-s[notcollapseditems,"cb2"]))/sum(notcollapseditems),
+    "b2.RMSE"=sqrt(sum((c[notcollapseditems,"cb2"]-s[notcollapseditems,"cb2"])^2)/sum(notcollapseditems)),
+    "b3.bias"=sum((c[notcollapseditems,"cb3"]-s[notcollapseditems,"cb3"]))/sum(notcollapseditems),
+    "b3.RMSE"=sqrt(sum((c[notcollapseditems,"cb3"]-s[notcollapseditems,"cb3"])^2)/sum(notcollapseditems)),
+    "b4.bias"=sum((c[notcollapseditems,"cb4"]-s[notcollapseditems,"cb4"]))/sum(notcollapseditems),
+    "b4.RMSE"=sqrt(sum((c[notcollapseditems,"cb4"]-s[notcollapseditems,"cb4"])^2)/sum(notcollapseditems))
+
+    )
+}))
+
+boxplot(main="RMSE of Estimated Parameters, All Conditions",
+  ParamErr[,c("a.RMSE", "b1.RMSE","b2.RMSE","b3.RMSE","b4.RMSE")])
+
+boxplot(main="RMSE of Estimated Parameters, Flat Info",
+  ParamErr[design_conditions[,"bankinfoshape"]=="flat",
+    c("a.RMSE", "b1.RMSE","b2.RMSE","b3.RMSE","b4.RMSE")])
+
+boxplot(main="RMSE of Estimated Parameters, Skewed Info",
+  ParamErr[design_conditions[,"bankinfoshape"]=="skewed",
+    c("a.RMSE", "b1.RMSE","b2.RMSE","b3.RMSE","b4.RMSE")])
+
+
+boxplot(main="RMSE of Estimated Parameters, Leptokurtic Info",
+  ParamErr[design_conditions[,"bankinfoshape"]=="leptokurtic",
+    c("a.RMSE", "b1.RMSE","b2.RMSE","b3.RMSE","b4.RMSE")])
+
+
+
+design_conditions[,"dimensions"]==3
+design_conditions[,"dimensions"]==5
+
+boxplot(
+  cbind(
+    "300"=ParamErr[design_conditions[,"calbsamplesize"]==300, "a.RMSE"],
+    "500"=ParamErr[design_conditions[,"calbsamplesize"]==500, "a.RMSE"],
+    "750"=ParamErr[design_conditions[,"calbsamplesize"]==750, "a.RMSE"],
+    "1000"=ParamErr[design_conditions[,"calbsamplesize"]==1000, "a.RMSE"]))
+
+
+boxplot( main="RMSE of Discrimination Parameter, 3 Dimensions",
+  cbind(
+    "300"=ParamErr[design_conditions[,"calbsamplesize"]==300 & design_conditions[,"dimensions"]==3, "a.RMSE"],
+    "500"=ParamErr[design_conditions[,"calbsamplesize"]==500 &  design_conditions[,"dimensions"]==3, "a.RMSE"],
+    "750"=ParamErr[design_conditions[,"calbsamplesize"]==750 & design_conditions[,"dimensions"]==3, "a.RMSE"],
+    "1000"=ParamErr[design_conditions[,"calbsamplesize"]==1000 & design_conditions[,"dimensions"]==3, "a.RMSE"]))
+
+boxplot( main="RMSE of Discrimination Parameter, 5 Dimensions",
+  cbind(
+    "300"=ParamErr[design_conditions[,"calbsamplesize"]==300 & design_conditions[,"dimensions"]==5, "a.RMSE"],
+    "500"=ParamErr[design_conditions[,"calbsamplesize"]==500 &  design_conditions[,"dimensions"]==5, "a.RMSE"],
+    "750"=ParamErr[design_conditions[,"calbsamplesize"]==750 & design_conditions[,"dimensions"]==5, "a.RMSE"],
+    "1000"=ParamErr[design_conditions[,"calbsamplesize"]==1000 & design_conditions[,"dimensions"]==5, "a.RMSE"]))
+
 
 ```
 
